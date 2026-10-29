@@ -71,6 +71,14 @@ Rules:
   "Team communication", "Issue tracking") - a description of the PRODUCT, not the OAuth setup.
 - If the developer describes what their integration will do, use it only to prioritize which
   scopes to list (narrower, more relevant scopes) - never to invent facts the excerpts don't support.
+- Each excerpt is labeled "SOURCE [i] <title> (<url>)". For any literal, copy-paste value -
+  an exact redirect/callback URL, an endpoint path, a specific header or parameter syntax -
+  only use a value if its source URL is on the provider's own domain (given below as
+  "Provider: <name> (<domain>)"). A third-party site (a tutorial, an unrelated SaaS product's
+  docs, an auth-proxy service) may describe its OWN callback URL or OWN integration, which is
+  not a fact about this provider - never present a third party's specific value as if it were
+  this provider's rule. Third-party excerpts may still inform general step descriptions or
+  known blockers, just never a literal value attributed to the provider.
 - Respond with ONLY a JSON object matching the given schema. No prose, no markdown fences.
 """
 

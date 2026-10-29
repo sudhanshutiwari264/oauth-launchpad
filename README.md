@@ -14,7 +14,7 @@ genuinely unclear versus what the docs confirm.
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 
-**[Live demo →](#)** _(add your deployed URL once published — see [DEPLOY.md](DEPLOY.md))_
+**[Live demo →](https://oauth-launchpad-smoky.vercel.app)** · API: `https://oauth-launchpad.fly.dev`
 
 </div>
 
@@ -142,6 +142,20 @@ on top of them*:
   guidance is only as reliable as the documentation it was extracted
   from, which is exactly why every claim is sourced and genuinely unclear
   points are surfaced instead of smoothed over.
+
+**A concrete example of "checked and corrected":** live-generating a Figma
+guide surfaced a real extraction bug — one of the five fetched sources was
+a third-party OAuth-proxy service (`klavis.ai`, correctly flagged
+`unverified` since it isn't `figma.com`), and the model had copied *that
+service's own* callback URL into the guide's redirect URI rule as if it
+were Figma's. That's a wrong instruction for anyone who followed it. Fixed
+by adding an explicit rule to the extraction prompt (`backend/llm.py`):
+literal, copy-paste values (exact URLs, endpoint paths) may only come from
+excerpts on the provider's own domain — a third-party page can still
+inform general steps or known blockers, just never supply a value
+attributed to the provider. Verified against the live model with a
+regression test (`backend/tests/test_llm_live.py`) that reproduces this
+exact scenario.
 
 ## Scope
 
