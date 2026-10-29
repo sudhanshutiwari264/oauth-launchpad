@@ -97,6 +97,58 @@ def test_identify_provider_rejects_empty_input():
         asyncio.run(research.identify_provider("   "))
 
 
+def test_identify_provider_rejects_unrelated_high_ranking_domain(monkeypatch):
+    """Reproduces a real production bug: a large, unrelated site (here,
+    GitHub's own docs) can rank well for a generic "<name> developer
+    platform" search without being related to the candidate at all - it
+    isn't on the third-party blocklist, so the old code confidently
+    researched the wrong product's OAuth setup entirely. Must fail instead
+    of guessing."""
+
+    async def fake_web_search(objective, search_queries):
+        return json.dumps(
+            {
+                "results": [
+                    {"url": "https://docs.github.com/en/some-unrelated-guide", "title": "A Guide", "excerpts": []},
+                    {"url": "https://docs.github.com/en/another-guide", "title": "Another Guide", "excerpts": []},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(tavily_client, "web_search", fake_web_search)
+
+    with pytest.raises(research.ResearchError):
+        asyncio.run(research.identify_provider("Zapier"))
+
+
+def test_identify_provider_finds_name_match_even_if_not_first_result(monkeypatch):
+    """The real official site doesn't have to be search result #1 - any
+    result whose domain contains the candidate's name should be found."""
+
+    async def fake_web_search(objective, search_queries):
+        return json.dumps(
+            {
+                "results": [
+                    {"url": "https://docs.github.com/en/unrelated", "title": "Unrelated", "excerpts": []},
+                    {"url": "https://zapier.com/developer", "title": "Zapier Developer Platform", "excerpts": []},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(tavily_client, "web_search", fake_web_search)
+
+    identity = asyncio.run(research.identify_provider("Zapier"))
+    assert identity["canonical_domain"] == "zapier.com"
+
+
+def test_identify_provider_uses_known_provider_name_for_direct_domain():
+    """For a re-check, naively title-casing the domain's first label would
+    turn "GitHub" into "Github" - known_provider_name must override that."""
+    identity = asyncio.run(research.identify_provider("github.com", known_provider_name="GitHub"))
+    assert identity["provider_name"] == "GitHub"
+    assert identity["canonical_domain"] == "github.com"
+
+
 def test_identify_provider_wraps_parallel_mcp_error(monkeypatch):
     """A Tavily outage/rate-limit (TavilyError) must become a clean
     ResearchError, not an unhandled exception that crashes the whole stream."""
@@ -212,7 +264,7 @@ def test_run_pipeline_stops_and_yields_error_event(monkeypatch):
     """If an early stage fails, the pipeline must stop and yield exactly one
     error event instead of continuing to later stages."""
 
-    async def failing_identify(app_name_or_website):
+    async def failing_identify(app_name_or_website, known_provider_name=None):
         raise research.ResearchError("identify_provider", "no good")
 
     monkeypatch.setattr(research, "identify_provider", failing_identify)

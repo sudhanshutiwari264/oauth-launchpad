@@ -67,7 +67,7 @@ def test_patch_missing_step_returns_404(monkeypatch, tmp_path):
 
 
 def test_generate_streams_progress_then_final_guide(monkeypatch, tmp_path):
-    async def fake_pipeline(app_name_or_website, existing_id=None, intended_use=None):
+    async def fake_pipeline(app_name_or_website, existing_id=None, intended_use=None, known_provider_name=None):
         yield {"stage": "identify_provider", "label": "Identifying the provider", "status": "running"}
         yield {"stage": "identify_provider", "label": "Identifying the provider", "status": "done"}
         yield {"stage": "complete", "status": "done", "guide": {"id": "fake-guide"}}
@@ -84,7 +84,7 @@ def test_generate_streams_progress_then_final_guide(monkeypatch, tmp_path):
 
 
 def test_generate_streams_error_event_on_failure(monkeypatch, tmp_path):
-    async def failing_pipeline(app_name_or_website, existing_id=None, intended_use=None):
+    async def failing_pipeline(app_name_or_website, existing_id=None, intended_use=None, known_provider_name=None):
         yield {"stage": "identify_provider", "label": "Identifying the provider", "status": "running"}
         yield {"stage": "identify_provider", "label": "Identifying the provider", "status": "error", "message": "boom"}
 
@@ -95,3 +95,50 @@ def test_generate_streams_error_event_on_failure(monkeypatch, tmp_path):
         lines = [json.loads(line) for line in response.text.strip().splitlines()]
         assert lines[-1]["status"] == "error"
         assert lines[-1]["message"] == "boom"
+
+
+def test_recheck_passes_existing_id_and_provider_name_through(monkeypatch, tmp_path):
+    """Re-checking must keep the guide's id and its existing provider_name
+    (not re-derive the name from the domain - see research.identify_provider's
+    known_provider_name docstring for why that would silently corrupt it)."""
+    captured = {}
+
+    with _client(monkeypatch, tmp_path) as client:
+        # A real, complete guide dict (not a stub) so the endpoint's
+        # response_model=OAuthGuide validation has something valid to
+        # serialize - the fake only needs to prove what it was *called*
+        # with, not simulate a fresh research result.
+        unchanged_guide = database.get_guide("github").model_dump(mode="json")
+
+        async def fake_pipeline(app_name_or_website, existing_id=None, intended_use=None, known_provider_name=None):
+            captured["app_name_or_website"] = app_name_or_website
+            captured["existing_id"] = existing_id
+            captured["known_provider_name"] = known_provider_name
+            yield {"stage": "complete", "status": "done", "guide": unchanged_guide}
+
+        monkeypatch.setattr(main.research, "run_pipeline", fake_pipeline)
+
+        response = client.post("/api/guides/github/recheck")
+        assert response.status_code == 200
+
+    assert captured["app_name_or_website"] == "github.com"
+    assert captured["existing_id"] == "github"
+    assert captured["known_provider_name"] == "GitHub"
+
+
+def test_recheck_missing_guide_returns_404(monkeypatch, tmp_path):
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.post("/api/guides/does-not-exist/recheck")
+        assert response.status_code == 404
+
+
+def test_recheck_surfaces_pipeline_error_as_502(monkeypatch, tmp_path):
+    async def failing_pipeline(app_name_or_website, existing_id=None, intended_use=None, known_provider_name=None):
+        yield {"stage": "search_documentation", "status": "error", "message": "no docs found"}
+
+    monkeypatch.setattr(main.research, "run_pipeline", failing_pipeline)
+
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.post("/api/guides/github/recheck")
+        assert response.status_code == 502
+        assert response.json()["detail"] == "no docs found"

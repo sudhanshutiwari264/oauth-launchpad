@@ -120,12 +120,19 @@ def _parse_fetch_results(raw: str) -> list[dict]:
 
 # --- Pipeline stages ------------------------------------------------------
 
-async def identify_provider(app_name_or_website: str) -> dict:
+async def identify_provider(app_name_or_website: str, known_provider_name: str | None = None) -> dict:
     """Work out a provider's display name and canonical domain from free-form input.
 
     If the input already looks like a URL or domain, we trust it directly
     (after a safety check). Otherwise we ask Tavily to search for the
     official site - we never guess a domain out of thin air.
+
+    `known_provider_name` is set when re-checking an already-researched
+    guide (see run_pipeline's `existing_id`): the domain is already known,
+    so there's no name to search for, and naively title-casing the domain's
+    first label (e.g. "github.com" -> "Github") would quietly corrupt a
+    correct name on every re-check. Passing the guide's existing name
+    through avoids that.
     """
     candidate = app_name_or_website.strip()
     if not candidate:
@@ -139,7 +146,7 @@ async def identify_provider(app_name_or_website: str) -> dict:
         domain = urlparse(url).hostname or ""
         if not domain or not is_safe_public_url(url):
             raise ResearchError("identify_provider", f"'{app_name_or_website}' isn't a public website we can research.")
-        provider_name = domain.split(".")[0].replace("-", " ").title()
+        provider_name = known_provider_name or domain.split(".")[0].replace("-", " ").title()
         return {"provider_name": provider_name, "canonical_domain": domain}
 
     try:
@@ -153,19 +160,33 @@ async def identify_provider(app_name_or_website: str) -> dict:
     if not results:
         raise ResearchError("identify_provider", f"Could not find an official website for '{candidate}'.")
 
-    domain = next(
-        (
-            urlparse(result["url"]).hostname
-            for result in results
-            if not _is_third_party_platform(urlparse(result["url"]).hostname)
-        ),
-        None,
-    )
-    if not domain:
+    candidates = [r for r in results if not _is_third_party_platform(urlparse(r["url"]).hostname)]
+    if not candidates:
         raise ResearchError(
             "identify_provider",
             f"Could not find an official website for '{candidate}' (only third-party listings were found).",
         )
+
+    # A large, unrelated site (a popular docs hub, a Q&A site) can rank
+    # well for a generic "<name> developer platform" search without being
+    # related to the candidate at all - the third-party blocklist above
+    # only catches known social/directory platforms, not this. Require the
+    # chosen domain to actually contain the candidate's name (the same
+    # signal _prioritize_own_domain and _correct_domain_from_pages already
+    # use downstream) rather than trusting raw search ranking; confidently
+    # researching the wrong product's OAuth setup is worse than failing
+    # and asking the developer to paste the website directly.
+    own_domain_match = next(
+        (r for r in candidates if _looks_like_providers_own_domain(urlparse(r["url"]).hostname, candidate)),
+        None,
+    )
+    if not own_domain_match:
+        raise ResearchError(
+            "identify_provider",
+            f"Could not confidently identify '{candidate}'s official website from search results - "
+            "try pasting its website directly instead.",
+        )
+    domain = urlparse(own_domain_match["url"]).hostname
     return {"provider_name": candidate.strip().title(), "canonical_domain": domain}
 
 
@@ -425,7 +446,12 @@ STAGE_LABELS = [
 ]
 
 
-async def run_pipeline(app_name_or_website: str, existing_id: str | None = None, intended_use: str | None = None):
+async def run_pipeline(
+    app_name_or_website: str,
+    existing_id: str | None = None,
+    intended_use: str | None = None,
+    known_provider_name: str | None = None,
+):
     """Run every stage in order, yielding a progress event after each one.
 
     Each event is a dict: {"stage", "label", "status": "running"|"done"|"error", ...}.
@@ -434,8 +460,11 @@ async def run_pipeline(app_name_or_website: str, existing_id: str | None = None,
 
     `existing_id` re-runs research for an already-saved guide and overwrites
     it in place (used by the "re-check sources" action) instead of creating
-    a new guide. `intended_use` is an optional free-text description of the
-    developer's integration, passed through to help prioritize scopes.
+    a new guide - pair it with `known_provider_name` (the guide's existing
+    provider_name) so re-checking doesn't re-derive (and potentially
+    corrupt) the name from the domain. `intended_use` is an optional
+    free-text description of the developer's integration, passed through
+    to help prioritize scopes.
     """
     identity = search_results = pages = extracted = validated = guide = None
 
@@ -443,7 +472,7 @@ async def run_pipeline(app_name_or_website: str, existing_id: str | None = None,
         yield {"stage": stage_name, "label": label, "status": "running"}
         try:
             if stage_name == "identify_provider":
-                identity = await identify_provider(app_name_or_website)
+                identity = await identify_provider(app_name_or_website, known_provider_name=known_provider_name)
             elif stage_name == "search_documentation":
                 search_results = await search_documentation(identity["provider_name"], identity["canonical_domain"])
             elif stage_name == "fetch_documentation":

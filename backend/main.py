@@ -123,7 +123,9 @@ async def recheck_guide(guide_id: str):
         raise HTTPException(status_code=404, detail=f"No guide found with id '{guide_id}'.")
 
     guide = None
-    async for event in research.run_pipeline(existing.canonical_domain, existing_id=guide_id):
+    async for event in research.run_pipeline(
+        existing.canonical_domain, existing_id=guide_id, known_provider_name=existing.provider_name
+    ):
         if event.get("status") == "error":
             raise HTTPException(status_code=502, detail=event.get("message", "Re-check failed."))
         if event.get("stage") == "complete":
