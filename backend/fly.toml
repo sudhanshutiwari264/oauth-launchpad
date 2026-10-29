@@ -1,29 +1,29 @@
-# Fly.io app config. Deploy with `fly launch --no-deploy` once to create the
-# app (it will offer to overwrite this file - decline, or diff afterwards),
-# then `fly deploy` by hand or via the GitHub Actions workflow at
-# .github/workflows/deploy-backend.yml. See ../DEPLOY.md for the full setup.
+# fly.toml app configuration file generated for oauth-launchpad on 2026-10-29T13:37:27Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "oauth-launchpad-api" # must be globally unique on Fly - change this
-primary_region = "iad"
+app = 'oauth-launchpad'
+primary_region = 'ams'
 
 [build]
 
 [env]
-  PORT = "8080"
+  PORT = '8080'
+
+[[mounts]]
+  source = 'oauth_launchpad_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
-
-[[mounts]]
-  source = "oauth_launchpad_data"
-  destination = "/data"
+  processes = ['app']
 
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = 'shared'
   cpus = 1
   memory_mb = 512
