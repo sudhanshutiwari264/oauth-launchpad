@@ -6,8 +6,9 @@ FastAPI app for OAuth Launchpad.
   GET   /api/guides/{id}
   POST  /api/guides/generate        (streams research progress, then the guide)
   PATCH /api/guides/{id}/steps/{step_id}
-  POST  /api/guides/{id}/recheck    (re-researches an existing guide in place)
-  POST  /api/admin/dedupe-guides    (admin-only; see its docstring)
+  POST   /api/guides/{id}/recheck    (re-researches an existing guide in place)
+  POST   /api/admin/dedupe-guides    (admin-only; see its docstring)
+  DELETE /api/admin/guides/{id}      (admin-only; see its docstring)
 """
 
 import json
@@ -135,25 +136,40 @@ async def recheck_guide(guide_id: str):
     return guide
 
 
-@app.post("/api/admin/dedupe-guides")
-def dedupe_guides(x_admin_token: str | None = Header(default=None)):
-    """Deletes leftover duplicate guides (same canonical domain, created
-    before generate_guide started reusing an existing guide instead of
-    creating a new one - or from an identify_provider mistake that's since
-    been corrected) and keeps the oldest guide per domain.
-
-    Requires the ADMIN_TOKEN env var to be set and match the
-    X-Admin-Token header - there's no user system in this app, so this
-    guards the one destructive admin action that exists against being
-    world-writable. If ADMIN_TOKEN isn't set, this endpoint always 403s
-    (fails closed) rather than being quietly open.
+def _require_admin(x_admin_token: str | None) -> None:
+    """Shared guard for /api/admin/* routes. Requires the ADMIN_TOKEN env
+    var to be set and match the X-Admin-Token header - there's no user
+    system in this app, so this guards the only destructive admin actions
+    that exist against being world-writable. If ADMIN_TOKEN isn't set,
+    these routes always 403 (fail closed) rather than being quietly open.
     """
     admin_token = os.environ.get("ADMIN_TOKEN")
     if not admin_token or x_admin_token != admin_token:
         raise HTTPException(status_code=403, detail="Not authorized.")
 
+
+@app.post("/api/admin/dedupe-guides")
+def dedupe_guides(x_admin_token: str | None = Header(default=None)):
+    """Deletes leftover duplicate guides (same canonical domain, created
+    before generate_guide started reusing an existing guide instead of
+    creating a new one - or from an identify_provider mistake that's since
+    been corrected) and keeps the oldest guide per domain."""
+    _require_admin(x_admin_token)
     deleted_ids = database.delete_duplicate_guides()
     return {"deleted_ids": deleted_ids, "deleted_count": len(deleted_ids)}
+
+
+@app.delete("/api/admin/guides/{guide_id}")
+def admin_delete_guide(guide_id: str, x_admin_token: str | None = Header(default=None)):
+    """Deletes one guide outright. For a guide that's wrong but isn't a
+    duplicate of anything (e.g. identify_provider landed on an unrelated
+    domain and there's only one bad copy, so dedupe-guides has nothing to
+    collapse it with) - delete it here, then generate a fresh guide for
+    the same app once the underlying bug is fixed."""
+    _require_admin(x_admin_token)
+    if not database.delete_guide(guide_id):
+        raise HTTPException(status_code=404, detail=f"No guide found with id '{guide_id}'.")
+    return {"deleted_id": guide_id}
 
 
 class UpdateStepRequest(BaseModel):

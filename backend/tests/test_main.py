@@ -171,3 +171,34 @@ def test_dedupe_guides_deletes_duplicates_with_correct_token(monkeypatch, tmp_pa
         body = response.json()
         assert body["deleted_count"] == 1
         assert body["deleted_ids"] == ["github-dup"]
+
+
+def test_admin_delete_guide_requires_admin_token_env_to_be_set(monkeypatch, tmp_path):
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.delete("/api/admin/guides/github", headers={"X-Admin-Token": "anything"})
+        assert response.status_code == 403
+
+
+def test_admin_delete_guide_rejects_wrong_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADMIN_TOKEN", "correct-token")
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.delete("/api/admin/guides/github", headers={"X-Admin-Token": "wrong-token"})
+        assert response.status_code == 403
+        assert database.get_guide("github") is not None
+
+
+def test_admin_delete_guide_removes_it_with_correct_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADMIN_TOKEN", "correct-token")
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.delete("/api/admin/guides/github", headers={"X-Admin-Token": "correct-token"})
+        assert response.status_code == 200
+        assert response.json() == {"deleted_id": "github"}
+        assert database.get_guide("github") is None
+
+
+def test_admin_delete_guide_returns_404_for_missing_guide(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADMIN_TOKEN", "correct-token")
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.delete("/api/admin/guides/does-not-exist", headers={"X-Admin-Token": "correct-token"})
+        assert response.status_code == 404
