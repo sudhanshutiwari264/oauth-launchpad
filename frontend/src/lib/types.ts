@@ -58,6 +58,7 @@ export interface AppSummary {
   provider_name: string;
   canonical_domain: string;
   category: string;
+  summary: string;
   setup_complexity: SetupComplexity;
   estimated_hands_on_setup_hours: number;
   approval_status: ApprovalStatus;

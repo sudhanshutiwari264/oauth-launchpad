@@ -159,14 +159,14 @@ function GenerateContent() {
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="rounded-xl border border-neutral-200 bg-white p-6">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
             <label className="text-sm font-medium text-neutral-900">App name or website</label>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="e.g. Zapier or zapier.com"
-              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+              className="mt-2 w-full rounded-lg border border-neutral-300 px-4 py-2.5 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none"
             />
             {looksLikeWebsite && (
               <p className="mt-2 flex items-center gap-1.5 text-sm text-emerald-700">
@@ -184,7 +184,7 @@ function GenerateContent() {
               onChange={(e) => setIntendedUse(e.target.value)}
               placeholder="e.g. Read a user's Zaps and show their run history in our dashboard"
               rows={4}
-              className="mt-2 w-full resize-none rounded-lg border border-neutral-300 px-4 py-2.5 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+              className="mt-2 w-full resize-none rounded-lg border border-neutral-300 px-4 py-2.5 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 focus:outline-none"
             />
             <p className="mt-1.5 text-xs text-neutral-400">
               Helps us recommend only the scopes you need — fewer scopes usually means an easier review.
@@ -193,7 +193,7 @@ function GenerateContent() {
             <button
               onClick={handleGenerate}
               disabled={!input.trim()}
-              className="mt-6 w-full rounded-lg bg-indigo-600 px-4 py-3 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
+              className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               Generate guide
             </button>
@@ -202,7 +202,7 @@ function GenerateContent() {
             </p>
           </div>
 
-          <aside className="h-fit rounded-xl border border-neutral-200 bg-white p-6">
+          <aside className="h-fit rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-neutral-900">What happens next</h2>
             <ol className="mt-4 flex flex-col gap-4">
               {WHAT_HAPPENS_NEXT.map((item, index) => (
@@ -279,7 +279,7 @@ function GenerateContent() {
           </div>
           <Link
             href={reusedExisting ? `/guides/${readyGuide.id}` : `/guides/${readyGuide.id}?generated=1`}
-            className="shrink-0 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+            className="shrink-0 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
           >
             Open guide
           </Link>
@@ -300,14 +300,14 @@ function GenerateContent() {
       )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="rounded-xl border border-neutral-200 bg-white p-6">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-neutral-900">Progress</h2>
             <span className="text-xs text-neutral-400">{phase === "ready" ? "Complete" : "Running"}</span>
           </div>
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
             <div
-              className="h-full rounded-full bg-indigo-600 transition-all duration-500"
+              className="h-full rounded-full bg-blue-600 transition-all duration-500"
               style={{ width: `${progressPercent(stageStatus)}%` }}
             />
           </div>
@@ -335,7 +335,7 @@ function GenerateContent() {
           )}
         </div>
 
-        <aside className="h-fit rounded-xl border border-neutral-200 bg-white p-6">
+        <aside className="h-fit rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-neutral-900">Sources found</h2>
             {readyGuide && <span className="text-xs text-neutral-400">{readyGuide.sources.length}</span>}
@@ -380,7 +380,15 @@ function StageRow({ label, status }: { label: string; status: StageStatus }) {
   return (
     <li className="flex items-center gap-3">
       <StageIcon status={status} />
-      <span className={status === "pending" ? "text-sm text-neutral-400" : "text-sm text-neutral-900"}>{label}</span>
+      <span
+        className={
+          status === "pending"
+            ? "text-sm text-neutral-400"
+            : "text-sm text-neutral-900"
+        }
+      >
+        {label}
+      </span>
     </li>
   );
 }
@@ -401,7 +409,7 @@ function StageIcon({ status }: { status: StageStatus }) {
     );
   }
   if (status === "running") {
-    return <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />;
+    return <span className="h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />;
   }
   return <span className="h-6 w-6 shrink-0 rounded-full border-2 border-neutral-200" />;
 }

@@ -73,7 +73,7 @@ export function ShareModal({ guide, onClose }: { guide: OAuthGuide; onClose: () 
           />
           <button
             onClick={copyLink}
-            className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
           >
             {linkCopied ? "Copied!" : "Copy link"}
           </button>

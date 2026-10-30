@@ -53,6 +53,7 @@ class AppSummary(BaseModel):
     provider_name: str
     canonical_domain: str
     category: str
+    summary: str
     setup_complexity: str
     estimated_hands_on_setup_hours: float
     approval_status: str
@@ -64,6 +65,7 @@ def _to_summary(guide: OAuthGuide) -> AppSummary:
         provider_name=guide.provider_name,
         canonical_domain=guide.canonical_domain,
         category=guide.category,
+        summary=guide.summary,
         setup_complexity=guide.setup_complexity.value,
         estimated_hands_on_setup_hours=guide.estimated_hands_on_setup_hours,
         approval_status=guide.approval_status.value,

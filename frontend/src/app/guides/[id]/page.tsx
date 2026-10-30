@@ -114,7 +114,7 @@ function GuideDetailContent() {
   return (
     <div>
       <nav className="mb-4 flex items-center gap-1.5 text-sm text-neutral-400">
-        <Link href="/guides" className="hover:text-neutral-700">
+        <Link href="/" className="hover:text-neutral-700">
           Guides
         </Link>
         <ChevronRightIcon className="h-3.5 w-3.5" />
@@ -201,7 +201,7 @@ function GuideDetailContent() {
                     href={`#${section.id}`}
                     className={`flex items-center justify-between py-1.5 pl-3 text-sm transition ${
                       isActive
-                        ? "border-l-2 border-indigo-600 -ml-px font-medium text-indigo-600"
+                        ? "border-l-2 border-blue-600 -ml-px font-medium text-blue-600"
                         : "text-neutral-500 hover:text-neutral-900"
                     }`}
                   >
@@ -218,8 +218,8 @@ function GuideDetailContent() {
           <Section id="overview" title="Overview" refCb={(el) => (sectionRefs.current.overview = el)}>
             <p className="text-[15px] leading-relaxed text-neutral-700">{guide.summary}</p>
 
-            <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
-              <p className="text-xs font-medium text-indigo-700">RECOMMENDED SETUP PATH</p>
+            <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+              <p className="text-xs font-medium text-blue-700">RECOMMENDED SETUP PATH</p>
               <p className="mt-1 font-medium text-neutral-900">{setupPathLabel(guide.recommended_setup_path)}</p>
               <p className="mt-1 text-sm text-neutral-600">{setupPathExplainer(guide.recommended_setup_path)}</p>
             </div>
@@ -413,7 +413,7 @@ function GuideDetailContent() {
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 font-medium text-indigo-600 hover:underline"
+                        className="flex items-center gap-1.5 font-medium text-blue-600 hover:underline"
                       >
                         {source.title}
                         <ExternalLinkIcon className="h-3.5 w-3.5 shrink-0" />
@@ -458,7 +458,7 @@ function GuideDetailContent() {
             )}
           </Section>
 
-          <div className="mt-8 flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-4">
+          <div className="mt-8 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-medium text-neutral-900">Was this guide accurate?</p>
             {feedback ? (
               <p className="text-sm text-neutral-500">Thanks for the feedback!</p>

@@ -23,6 +23,12 @@ function colorForName(name: string): string {
   return PALETTE[hash % PALETTE.length];
 }
 
+const SIZES = {
+  sm: { pixels: 28, dimensions: "h-7 w-7 text-xs" },
+  md: { pixels: 36, dimensions: "h-9 w-9 text-sm" },
+  lg: { pixels: 44, dimensions: "h-11 w-11 text-lg" },
+};
+
 export function ProviderIcon({
   name,
   domain,
@@ -30,11 +36,10 @@ export function ProviderIcon({
 }: {
   name: string;
   domain?: string;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
 }) {
   const [logoFailed, setLogoFailed] = useState(false);
-  const pixelSize = size === "lg" ? 44 : 36;
-  const dimensions = size === "lg" ? "h-11 w-11 text-lg" : "h-9 w-9 text-sm";
+  const { pixels: pixelSize, dimensions } = SIZES[size];
 
   if (domain && !logoFailed) {
     return (
@@ -44,7 +49,7 @@ export function ProviderIcon({
         alt={`${name} logo`}
         width={pixelSize}
         height={pixelSize}
-        className={`${dimensions} shrink-0 rounded-md border border-slate-200 bg-white object-contain p-1`}
+        className={`${dimensions} shrink-0 rounded-xl border border-neutral-200 bg-white object-contain p-1`}
         onError={() => setLogoFailed(true)}
       />
     );
@@ -52,7 +57,7 @@ export function ProviderIcon({
 
   return (
     <span
-      className={`flex ${dimensions} shrink-0 items-center justify-center rounded-md font-semibold ${colorForName(name)}`}
+      className={`flex ${dimensions} shrink-0 items-center justify-center rounded-xl font-semibold ${colorForName(name)}`}
     >
       {name.charAt(0).toUpperCase()}
     </span>
