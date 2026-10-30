@@ -2,7 +2,7 @@
 Tests for the FastAPI app in main.py, using FastAPI's TestClient (no real
 server process, no network). Each test points the database at a fresh temp
 file. The generate-guide test replaces research.run_pipeline with a fake
-async generator so it doesn't depend on Parallel or TarqaAI being reachable.
+async generator so it doesn't depend on Tavily or TarqaAI being reachable.
 """
 
 import json

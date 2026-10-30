@@ -236,17 +236,23 @@ MIN_DOMAIN_CONSENSUS = 2
 
 
 def _looks_like_providers_own_domain(hostname: str | None, provider_name: str) -> bool:
-    """True if `hostname` contains the provider's name, e.g. "linear.app" or
-    "developers.linear.app" for provider "Linear". This is scoped to results
-    from the OAuth-doc-specific search (not the broader "official website"
-    search, which can match unrelated same-named companies), so it's a
-    fairly safe signal that the result is the provider's own site rather
-    than a third-party integration guide or directory listing."""
+    """True if `hostname` looks like the provider's own site: either it
+    contains the full name (e.g. "linear.app" for "Linear"), or - for a
+    multi-word product name - it contains at least one distinctive word
+    from it. The second check matters because a product's own domain
+    often doesn't spell out its full name: "Microsoft Teams" lives at
+    microsoft.com, not microsoftteams.anything, so requiring the whole
+    name as one substring would reject the provider's real site and (via
+    identify_provider) fail a perfectly good search instead of guessing."""
     if not hostname:
         return False
     normalized_host = re.sub(r"[^a-z0-9]", "", hostname.lower())
     normalized_name = re.sub(r"[^a-z0-9]", "", provider_name.lower())
-    return bool(normalized_name) and normalized_name in normalized_host
+    if normalized_name and normalized_name in normalized_host:
+        return True
+
+    words = [re.sub(r"[^a-z0-9]", "", word.lower()) for word in provider_name.split()]
+    return any(len(word) >= 4 and word in normalized_host for word in words)
 
 
 def _prioritize_own_domain(results: list[dict], provider_name: str) -> list[dict]:

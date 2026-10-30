@@ -121,6 +121,44 @@ def test_identify_provider_rejects_unrelated_high_ranking_domain(monkeypatch):
         asyncio.run(research.identify_provider("Zapier"))
 
 
+def test_identify_provider_matches_multi_word_brand_to_parent_domain(monkeypatch):
+    """Reproduces a real production bug: requiring the FULL candidate name
+    as one substring rejects "Microsoft Teams" ever matching microsoft.com,
+    since the product name doesn't literally appear in the parent brand's
+    domain - even though Tavily correctly returns microsoft.com as the top
+    result. A distinctive word from the name ("microsoft") must be enough."""
+
+    async def fake_web_search(objective, search_queries):
+        return json.dumps(
+            {
+                "results": [
+                    {"url": "https://leadiq.com/c/microsoft-teams", "title": "Microsoft Teams on LeadIQ", "excerpts": []},
+                    {"url": "https://www.microsoft.com/en-us/microsoft-teams/log-in", "title": "Microsoft Teams", "excerpts": []},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(tavily_client, "web_search", fake_web_search)
+
+    identity = asyncio.run(research.identify_provider("Microsoft Teams"))
+    assert identity["canonical_domain"] == "www.microsoft.com"
+
+
+def test_identify_provider_still_rejects_unrelated_domain_for_short_generic_word(monkeypatch):
+    """The word-level fallback must not make matching too loose: a generic
+    short word still shouldn't let an unrelated site through."""
+
+    async def fake_web_search(objective, search_queries):
+        return json.dumps(
+            {"results": [{"url": "https://docs.uipath.com/teams-integration", "title": "Teams on UiPath", "excerpts": []}]}
+        )
+
+    monkeypatch.setattr(tavily_client, "web_search", fake_web_search)
+
+    with pytest.raises(research.ResearchError):
+        asyncio.run(research.identify_provider("Teams"))
+
+
 def test_identify_provider_finds_name_match_even_if_not_first_result(monkeypatch):
     """The real official site doesn't have to be search result #1 - any
     result whose domain contains the candidate's name should be found."""

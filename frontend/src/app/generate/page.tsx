@@ -338,7 +338,7 @@ function GenerateContent() {
             </ul>
           )}
           <p className="mt-4 border-t border-neutral-100 pt-3 text-xs text-neutral-400">
-            Only official pages are used. Research by Parallel · Models via Tarqa AI.
+            Only official pages are used. Research by Tavily · Models via Tarqa AI.
           </p>
         </aside>
       </div>
