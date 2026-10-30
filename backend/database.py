@@ -80,6 +80,56 @@ def list_guides() -> list[OAuthGuide]:
     return sorted(guides, key=lambda g: g.provider_name.lower())
 
 
+def _normalize_domain(domain: str) -> str:
+    return domain.lower().removeprefix("www.")
+
+
+def find_guide_by_domain(canonical_domain: str) -> OAuthGuide | None:
+    """Look up an existing guide by canonical domain (case-insensitive,
+    ignoring a leading "www."). Used so generating a guide for a provider
+    that's already been researched reuses the existing guide instead of
+    creating a duplicate."""
+    target = _normalize_domain(canonical_domain)
+    for guide in list_guides():
+        if _normalize_domain(guide.canonical_domain) == target:
+            return guide
+    return None
+
+
+def delete_guide(guide_id: str) -> bool:
+    """Delete one guide by id. Returns True if a row was actually deleted."""
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM guides WHERE id = ?", (guide_id,))
+    return cursor.rowcount > 0
+
+
+def delete_duplicate_guides() -> list[str]:
+    """Find guides that share a canonical domain - leftovers from before
+    duplicate-prevention existed, or from identify_provider mistakes that
+    have since been re-checked under the correct domain - and delete all
+    but the oldest one per domain. Returns the ids that were deleted."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, data, created_at FROM guides").fetchall()
+
+    by_domain: dict[str, list[tuple[str, str]]] = {}
+    for guide_id, data, created_at in rows:
+        domain = _normalize_domain(json.loads(data)["canonical_domain"])
+        by_domain.setdefault(domain, []).append((guide_id, created_at))
+
+    to_delete = []
+    for entries in by_domain.values():
+        if len(entries) <= 1:
+            continue
+        entries.sort(key=lambda entry: entry[1])  # oldest created_at first
+        to_delete.extend(guide_id for guide_id, _ in entries[1:])
+
+    if to_delete:
+        with get_connection() as conn:
+            conn.executemany("DELETE FROM guides WHERE id = ?", [(gid,) for gid in to_delete])
+
+    return to_delete
+
+
 def update_step_completion(guide_id: str, step_id: str, completed: bool) -> OAuthGuide | None:
     """Flip one setup step's completed flag and persist the whole guide. Returns the
     updated guide, or None if the guide or step doesn't exist."""

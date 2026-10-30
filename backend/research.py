@@ -471,14 +471,35 @@ async def run_pipeline(
     corrupt) the name from the domain. `intended_use` is an optional
     free-text description of the developer's integration, passed through
     to help prioritize scopes.
+
+    On a fresh request (no `existing_id`), once the provider's domain is
+    known this also checks for an already-saved guide on that domain and,
+    if found, short-circuits straight to "complete" with that guide instead
+    of researching and saving a duplicate. Use "Re-check sources" on the
+    existing guide to deliberately refresh it instead.
     """
     identity = search_results = pages = extracted = validated = guide = None
+    is_fresh_request = existing_id is None
 
     for stage_name, label in STAGE_LABELS:
         yield {"stage": stage_name, "label": label, "status": "running"}
         try:
             if stage_name == "identify_provider":
                 identity = await identify_provider(app_name_or_website, known_provider_name=known_provider_name)
+                if is_fresh_request:
+                    duplicate = database.find_guide_by_domain(identity["canonical_domain"])
+                    if duplicate is not None:
+                        yield {"stage": stage_name, "label": label, "status": "done"}
+                        for remaining_stage, remaining_label in STAGE_LABELS[STAGE_LABELS.index((stage_name, label)) + 1 :]:
+                            yield {"stage": remaining_stage, "label": remaining_label, "status": "running"}
+                            yield {"stage": remaining_stage, "label": remaining_label, "status": "done"}
+                        yield {
+                            "stage": "complete",
+                            "status": "done",
+                            "guide": duplicate.model_dump(mode="json"),
+                            "reused_existing": True,
+                        }
+                        return
             elif stage_name == "search_documentation":
                 search_results = await search_documentation(identity["provider_name"], identity["canonical_domain"])
             elif stage_name == "fetch_documentation":

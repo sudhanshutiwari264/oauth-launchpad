@@ -78,4 +78,8 @@ export interface GenerateEvent {
   status: "running" | "done" | "error";
   message?: string;
   guide?: OAuthGuide;
+  // True when "complete" returns an already-researched guide for this
+  // domain instead of running fresh research - see backend/research.py's
+  // run_pipeline docstring. Use "Re-check sources" to force a refresh.
+  reused_existing?: boolean;
 }

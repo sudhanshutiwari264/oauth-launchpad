@@ -6,12 +6,14 @@ pipeline reacts when a stage fails.
 
 import asyncio
 import json
+from datetime import datetime, timezone
 
+import database
 import llm
 import tavily_client
 import pytest
 import research
-from guide_schema import ResponsibleParty, SetupComplexity, VerificationStatus
+from guide_schema import OAuthGuide, ResponsibleParty, SetupComplexity, VerificationStatus
 
 
 def test_parse_search_results_filters_unsafe_urls():
@@ -312,6 +314,73 @@ def test_run_pipeline_stops_and_yields_error_event(monkeypatch):
     assert events[-1]["status"] == "error"
     assert events[-1]["stage"] == "identify_provider"
     assert not any(e["stage"] == "search_documentation" for e in events)
+
+
+def _save_existing_guide(monkeypatch, tmp_path, guide_id="existing-id", canonical_domain="acme.com"):
+    monkeypatch.setattr(database, "DATABASE_PATH", str(tmp_path / "test.db"))
+    database.init_db()
+    database.save_guide(
+        OAuthGuide(
+            id=guide_id,
+            provider_name="Acme",
+            canonical_domain=canonical_domain,
+            summary="Existing guide.",
+            recommended_setup_path="custom",
+            setup_complexity="low",
+            estimated_hands_on_setup_hours=1.0,
+            approval_status="not_required",
+            last_researched_at=datetime.now(timezone.utc),
+        )
+    )
+
+
+def test_run_pipeline_reuses_existing_guide_for_fresh_request(monkeypatch, tmp_path):
+    """A fresh generate request for a domain that's already been researched
+    must reuse the existing guide instead of running the rest of the
+    pipeline and saving a duplicate."""
+    _save_existing_guide(monkeypatch, tmp_path)
+
+    async def fake_identify(app_name_or_website, known_provider_name=None):
+        return {"provider_name": "Acme", "canonical_domain": "acme.com"}
+
+    monkeypatch.setattr(research, "identify_provider", fake_identify)
+
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("search_documentation must not run when an existing guide is reused")
+
+    monkeypatch.setattr(research, "search_documentation", must_not_run)
+
+    events = asyncio.run(_collect(research.run_pipeline("Acme")))
+
+    assert events[-1]["stage"] == "complete"
+    assert events[-1]["reused_existing"] is True
+    assert events[-1]["guide"]["id"] == "existing-id"
+    assert len(database.list_guides()) == 1  # no duplicate was saved
+
+
+def test_run_pipeline_recheck_does_not_short_circuit_on_duplicate(monkeypatch, tmp_path):
+    """A re-check (existing_id set) must always do the real research for
+    that specific guide, even though a guide already exists on this
+    domain - that's the point of a re-check, not a duplicate to avoid."""
+    _save_existing_guide(monkeypatch, tmp_path)
+
+    async def fake_identify(app_name_or_website, known_provider_name=None):
+        return {"provider_name": "Acme", "canonical_domain": "acme.com"}
+
+    monkeypatch.setattr(research, "identify_provider", fake_identify)
+
+    search_was_called = False
+
+    async def fake_search_documentation(provider_name, canonical_domain):
+        nonlocal search_was_called
+        search_was_called = True
+        raise research.ResearchError("search_documentation", "stop here, that's enough for this test")
+
+    monkeypatch.setattr(research, "search_documentation", fake_search_documentation)
+
+    asyncio.run(_collect(research.run_pipeline("acme.com", existing_id="existing-id")))
+
+    assert search_was_called
 
 
 def test_is_third_party_platform_catches_subdomains():

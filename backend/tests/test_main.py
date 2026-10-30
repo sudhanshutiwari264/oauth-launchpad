@@ -142,3 +142,32 @@ def test_recheck_surfaces_pipeline_error_as_502(monkeypatch, tmp_path):
         response = client.post("/api/guides/github/recheck")
         assert response.status_code == 502
         assert response.json()["detail"] == "no docs found"
+
+
+def test_dedupe_guides_requires_admin_token_env_to_be_set(monkeypatch, tmp_path):
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.post("/api/admin/dedupe-guides", headers={"X-Admin-Token": "anything"})
+        assert response.status_code == 403
+
+
+def test_dedupe_guides_rejects_wrong_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADMIN_TOKEN", "correct-token")
+    with _client(monkeypatch, tmp_path) as client:
+        response = client.post("/api/admin/dedupe-guides", headers={"X-Admin-Token": "wrong-token"})
+        assert response.status_code == 403
+
+
+def test_dedupe_guides_deletes_duplicates_with_correct_token(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADMIN_TOKEN", "correct-token")
+    with _client(monkeypatch, tmp_path) as client:
+        # github/slack/google are already seeded on distinct domains, so add
+        # a genuine duplicate domain to actually exercise the deletion path.
+        duplicate = database.get_guide("github").model_copy(update={"id": "github-dup"})
+        database.save_guide(duplicate)
+
+        response = client.post("/api/admin/dedupe-guides", headers={"X-Admin-Token": "correct-token"})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["deleted_count"] == 1
+        assert body["deleted_ids"] == ["github-dup"]

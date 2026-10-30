@@ -67,6 +67,7 @@ function GenerateContent() {
   const [stageStatus, setStageStatus] = useState<Record<GenerateStageName, StageStatus>>(emptyStageStatus());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [readyGuide, setReadyGuide] = useState<OAuthGuide | null>(null);
+  const [reusedExisting, setReusedExisting] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   const startedAtRef = useRef<number | null>(null);
@@ -91,6 +92,7 @@ function GenerateContent() {
     setPhase("running");
     setErrorMessage(null);
     setReadyGuide(null);
+    setReusedExisting(false);
     setStageStatus(emptyStageStatus());
     startedAtRef.current = Date.now();
     setElapsedMs(0);
@@ -104,6 +106,7 @@ function GenerateContent() {
         (event: GenerateEvent) => {
           if (event.stage === "complete" && event.guide) {
             setReadyGuide(event.guide);
+            setReusedExisting(Boolean(event.reused_existing));
             setPhase("ready");
             return;
           }
@@ -143,6 +146,7 @@ function GenerateContent() {
     setStageStatus(emptyStageStatus());
     setErrorMessage(null);
     setReadyGuide(null);
+    setReusedExisting(false);
   }
 
   if (phase === "form") {
@@ -224,7 +228,11 @@ function GenerateContent() {
     );
   }
 
-  const stepLabel = readyGuide ? `${readyGuide.provider_name} guide ready` : `Generating a guide for “${input.trim()}”`;
+  const stepLabel = readyGuide
+    ? reusedExisting
+      ? `We already have a ${readyGuide.provider_name} guide`
+      : `${readyGuide.provider_name} guide ready`
+    : `Generating a guide for “${input.trim()}”`;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -246,7 +254,11 @@ function GenerateContent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-neutral-900">{stepLabel}</h1>
           <p className="text-sm text-neutral-500">
-            {phase === "ready" ? `Finished in ${formatElapsed(elapsedMs)}` : `Running for ${formatElapsed(elapsedMs)}`}
+            {phase === "ready"
+              ? reusedExisting
+                ? "No need to research it again"
+                : `Finished in ${formatElapsed(elapsedMs)}`
+              : `Running for ${formatElapsed(elapsedMs)}`}
           </p>
         </div>
       </div>
@@ -254,14 +266,19 @@ function GenerateContent() {
       {phase === "ready" && readyGuide && (
         <div className="mt-6 flex flex-col items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center">
           <div>
-            <p className="font-medium text-emerald-900">Your {readyGuide.provider_name} guide is ready</p>
+            <p className="font-medium text-emerald-900">
+              {reusedExisting
+                ? `${readyGuide.provider_name} was already researched`
+                : `Your ${readyGuide.provider_name} guide is ready`}
+            </p>
             <p className="text-sm text-emerald-700">
-              {readyGuide.setup_steps.length} steps · {readyGuide.sources.length} official sources ·{" "}
-              {readyGuide.unknowns.length} open questions
+              {reusedExisting
+                ? "Opening the existing guide instead of creating a duplicate — use Re-check sources on it if you want a fresh look."
+                : `${readyGuide.setup_steps.length} steps · ${readyGuide.sources.length} official sources · ${readyGuide.unknowns.length} open questions`}
             </p>
           </div>
           <Link
-            href={`/guides/${readyGuide.id}?generated=1`}
+            href={reusedExisting ? `/guides/${readyGuide.id}` : `/guides/${readyGuide.id}?generated=1`}
             className="shrink-0 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
           >
             Open guide
